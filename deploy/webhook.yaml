@@ -1,0 +1,28 @@
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: default/cost-injector
+  labels:
+    apps.kubernetes.io/name: cost-injector
+  name: cost-injector
+webhooks:
+- admissionReviewVersions:
+  - v1beta1
+  clientConfig:
+    service:
+      name: cost-injector
+      path: /mutate
+      port: 443
+  failurePolicy: Ignore
+  name: cost-injector.statcan.gc.ca
+  rules:
+  - apiGroups:
+    - ""
+    apiVersions:
+    - v1
+    operations:
+    - CREATE
+    resources:
+    - pods
+    scope: '*'

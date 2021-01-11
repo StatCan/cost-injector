@@ -1,0 +1,19 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: cost-injector
+  labels:
+    apps.kubernetes.io/name: cost-injector
+spec:
+  secretName: cost-injector-tls
+  commonName: "cost-injector.default.svc.cluster.local"
+  dnsNames:
+  - cost-injector
+  - cost-injector.default
+  - cost-injector.default.svc
+  - cost-injector.default.svc.cluster
+  isCA: true
+  duration: 8760h
+  issuerRef:
+    name: cost-injector-issuer
+    kind: Issuer

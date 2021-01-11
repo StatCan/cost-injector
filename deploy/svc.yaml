@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: cost-injector
+  labels:
+    apps.kubernetes.io/name: cost-injector
+spec:
+  selector:
+    apps.kubernetes.io/name: cost-injector
+  ports:
+  - name: https
+    port: 443
+    targetPort: 8443

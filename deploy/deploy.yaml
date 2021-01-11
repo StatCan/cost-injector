@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cost-injector
+  labels:
+    apps.kubernetes.io/name: cost-injector
+spec:
+  selector:
+    matchLabels:
+      apps.kubernetes.io/name: cost-injector
+  template:
+    metadata:
+      labels:
+        apps.kubernetes.io/name: cost-injector
+      annotations:
+        sidecar.istio.io/inject: 'false'
+    spec:
+      serviceAccountName: cost-injector
+      imagePullSecrets:
+        - name: k8scc01covidacr-registry-connection
+      containers:
+      - name: cost-injector
+        image: cost-injector:latest
+        imagePullPolicy: Always
+        args:
+          - -configFile=/etc/webhook/config/config.yaml
+          - -alsologtostderr
+          - -v=4
+          - 2>&1
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - name: https
+          containerPort: 8443
+        volumeMounts:
+        - name: certs
+          mountPath: /certs
+          readOnly: true
+        - name: config
+          mountPath: /etc/webhook/config
+      volumes:
+      - name: certs
+        secret:
+          secretName: cost-injector-tls
+      - name: config
+        configMap:
+          name: cost-injector

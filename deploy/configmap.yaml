@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cost-injector
+data:
+  config.yaml: |
+    annotations:
+      ci:
+        _all:
+          "dept.gc.ca/workload-id": "1337"
+      web:
+        gitlab:
+          "dept.gc.ca/workload-id": "2674"
+    env:
+      ci:
+        _all:
+          - name: "WORKLOAD_ID"
+            value: "1337"
+      web:
+        gitlab:
+          - name: "WORKLOAD_ID"
+            value: "2674"
