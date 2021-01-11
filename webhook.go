@@ -37,6 +37,9 @@ var ignoredNamespaces = []string{
 const (
 	admissionWebhookInject = "cost-injector-webhook-inject"
 	admissionWebhookStatus = "cost-injector-webhook-status"
+
+	WorkloadsAll   = "_all"
+	EnvVarNotFound = -1
 )
 
 type MutatingWebhookServer struct {
@@ -49,8 +52,8 @@ type MutatingWebhookServerParams struct {
 }
 
 type Config struct {
-	Annotations map[string]map[string]string `yaml:"annotations"`
-	Env         map[string][]corev1.EnvVar   `yaml:"env"`
+	Annotations map[string]map[string]map[string]string `yaml:"annotations"`
+	Env         map[string]map[string][]corev1.EnvVar   `yaml:"env"`
 }
 
 type patchOperation struct {
@@ -64,18 +67,64 @@ func init() {
 	_ = admissionregistrationv1beta1.AddToScheme(runtimeScheme)
 }
 
+func indexOfEnvVar(needle corev1.EnvVar, haystack []corev1.EnvVar) int {
+	for indx, envvar := range haystack {
+		if envvar.Name == needle.Name {
+			return indx
+		}
+	}
+
+	return EnvVarNotFound
+}
+
 func createPatch(pod *corev1.Pod, config *Config, annotations map[string]string) ([]byte, error) {
 	var patches []patchOperation
 
 	if namespaceEnv, ok := config.Env[pod.Namespace]; ok {
+		envvars := make([]corev1.EnvVar, 0)
+
+		// Add environment variables from WorkloadsAll
+		if allEnvVars, ok := namespaceEnv[WorkloadsAll]; ok {
+			for _, envvar := range allEnvVars {
+				envvars = append(envvars, envvar)
+			}
+		}
+
+		// Add environment variables for app.kubernetes.io/name label value on the pod
+		if name, ok := pod.ObjectMeta.Labels["app.kubernetes.io/name"]; ok {
+			if nameEnvVars, ok := namespaceEnv[name]; ok {
+				for _, envvar := range nameEnvVars {
+					// Check if we already have this env var from WorkloadsAll,
+					// and if we do, replace it rather than add it.
+					if indx := indexOfEnvVar(envvar, envvars); indx >= 0 {
+						envvars[indx] = envvar
+					} else {
+						envvars = append(envvars, envvar)
+					}
+				}
+			}
+		}
+
 		for index, container := range pod.Spec.Containers {
-			patches = append(patches, updateEnv(container.Env, namespaceEnv, fmt.Sprintf("/spec/containers/%d/env", index))...)
+			patches = append(patches, updateEnv(container.Env, envvars, fmt.Sprintf("/spec/containers/%d/env", index))...)
 		}
 	}
 
 	if namespaceAnnotations, ok := config.Annotations[pod.Namespace]; ok {
-		for k, v := range namespaceAnnotations {
-			annotations[k] = v
+		// Add annotations from WorkloadsAll
+		if allAnnotations, ok := namespaceAnnotations[WorkloadsAll]; ok {
+			for k, v := range allAnnotations {
+				annotations[k] = v
+			}
+		}
+
+		// Add environment variables for app.kubernetes.io/name label value on the pod
+		if name, ok := pod.ObjectMeta.Labels["app.kubernetes.io/name"]; ok {
+			if nameAnnotations, ok := namespaceAnnotations[name]; ok {
+				for k, v := range nameAnnotations {
+					annotations[k] = v
+				}
+			}
 		}
 	}
 
